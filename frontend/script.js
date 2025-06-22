@@ -1,4 +1,4 @@
-const apiUrl = 'https://dreams-to-stories-backend.onrender.com'; // Replace with your actual Render backend URL
+const apiUrl = 'https://dreams-to-stories-backend.onrender.com'; // Your backend URL
 
 const dreamInput = document.getElementById('dreamInput');
 const storyOutput = document.getElementById('storyOutput');
@@ -17,21 +17,19 @@ generateBtn.addEventListener('click', async () => {
   try {
     const response = await fetch(`${apiUrl}/generate-story`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dream: userDream })
     });
 
     const data = await response.json();
 
-    if (response.ok) {
+    if (response.ok && data.story) {
       storyOutput.innerText = data.story;
     } else {
-      storyOutput.innerText = `Error: ${data.error || 'Something went wrong'}`;
+      storyOutput.innerText = `❌ Error: ${data.error?.message || 'Something went wrong'}`;
     }
   } catch (error) {
-    console.error('Error generating story:', error);
-    storyOutput.innerText = 'Failed to connect to the server.';
+    console.error('Error:', error);
+    storyOutput.innerText = '❌ Failed to connect to the server.';
   }
 });
