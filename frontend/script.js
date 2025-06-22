@@ -1,35 +1,37 @@
-// This function is triggered when the user clicks the 'Generate Story' button
-async function generateStory() {
-  const dream = document.getElementById('dream').value;
-  const storyDiv = document.getElementById('story');
+const apiUrl = 'https://dreams-to-stories-backend.onrender.com'; // Replace with your actual Render backend URL
 
-  // Show message if dream input is empty
-  if (!dream.trim()) {
-    storyDiv.innerHTML = 'Please enter a dream first.';
+const dreamInput = document.getElementById('dreamInput');
+const storyOutput = document.getElementById('storyOutput');
+const generateBtn = document.getElementById('generateBtn');
+
+generateBtn.addEventListener('click', async () => {
+  const userDream = dreamInput.value.trim();
+
+  if (!userDream) {
+    alert('Please enter a dream.');
     return;
   }
 
-  // Display loading message while waiting for AI response
-  storyDiv.innerHTML = '✨ Generating story... Please wait ✨';
+  storyOutput.innerText = 'Generating your story... Please wait...';
 
   try {
-    // Send POST request to backend API
-    const response = await fetch('http://localhost:3000/generate-story', {
+    const response = await fetch(`${apiUrl}/generate-story`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dream }) // Send the dream to the backend
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ dream: userDream })
     });
 
     const data = await response.json();
 
-    // If a story is returned, display it; otherwise show error
-    if (data.story) {
-      storyDiv.innerHTML = `📖 <b>Your Story:</b><br><br>${data.story}`;
+    if (response.ok) {
+      storyOutput.innerText = data.story;
     } else {
-      storyDiv.innerHTML = `❌ Error: ${data.error || 'Something went wrong'}`;
+      storyOutput.innerText = `Error: ${data.error || 'Something went wrong'}`;
     }
-  } catch (err) {
-    // Handle fetch/network errors
-    storyDiv.innerHTML = `❌ Error: ${err.message}`;
+  } catch (error) {
+    console.error('Error generating story:', error);
+    storyOutput.innerText = 'Failed to connect to the server.';
   }
-}
+});
