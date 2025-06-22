@@ -1,86 +1,84 @@
+// ✅ Load environment variables first
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const axios = require('axios');
-require('dotenv').config(); // Load .env variables
+const path = require('path');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware setup
 app.use(cors());
 app.use(bodyParser.json());
 
-// Handle dream submission and store it
+// Handle dream submission
 app.post('/submit-dream', (req, res) => {
   const { dream } = req.body;
-  const file = 'dreams.json';
+  if (!dream) return res.status(400).json({ error: 'No dream received' });
 
-  // Read existing dreams or start new array
-  const data = fs.existsSync(file)
-    ? JSON.parse(fs.readFileSync(file, 'utf8'))
-    : [];
+  const filePath = path.join(__dirname, 'dreams.json');
+  let dreams = [];
 
-  data.push({ dream, timestamp: new Date() });
+  if (fs.existsSync(filePath)) {
+    dreams = JSON.parse(fs.readFileSync(filePath));
+  }
 
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  dreams.push({ dream, timestamp: new Date().toISOString() });
 
-  res.json({ message: 'Dream received!' });
+  fs.writeFileSync(filePath, JSON.stringify(dreams, null, 2));
+  res.json({ message: 'Dream received' });
 });
 
-// Get all submitted dreams
-app.get('/dreams', (req, res) => {
-  const file = 'dreams.json';
-  const data = fs.existsSync(file)
-    ? JSON.parse(fs.readFileSync(file, 'utf8'))
-    : [];
-
-  res.json(data);
-});
-
-// Generate a story from dream using OpenRouter
+// Handle story generation
 app.post('/generate-story', async (req, res) => {
   const { dream } = req.body;
+  if (!dream) return res.status(400).json({ error: 'No dream provided' });
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Missing API key' });
 
   try {
-    const response = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model: 'meta-llama/llama-3-8b-instruct',
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://siribeesu.github.io/dreams-to-stories-frontend/', // required
+        'X-Title': 'dreams-to-stories'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
-            content:
-              "You are a children’s story writer. Only write magical, short stories in paragraph form. Do NOT write poems. The tone should be fun and imaginative, like a bedtime tale."
+            content: 'You are a magical story generator that turns dreams into short, vivid, adventure stories for children and teens.'
           },
           {
             role: 'user',
-            content: `Turn this dream into a short magical story: ${dream}`
+            content: dream
           }
         ]
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'http://localhost:3000', // or your deployed frontend domain
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const story = response.data.choices[0].message.content;
-    res.json({ story });
-
-  } catch (error) {
-    // Improved error logging and feedback
-    console.error("OpenRouter Error:", error.response?.data || error.message);
-
-    res.status(500).json({
-      story: null,
-      error: error.response?.data?.error?.message || error.message
+      })
     });
+
+    const data = await response.json();
+
+    if (data?.choices?.[0]?.message?.content) {
+      res.json({ story: data.choices[0].message.content });
+    } else {
+      console.error('Unexpected API response:', data);
+      res.status(500).json({ error: 'Error generating story' });
+    }
+  } catch (err) {
+    console.error('Fetch error:', err.message);
+    res.status(500).json({ error: 'Story generation failed' });
   }
 });
 
-// Start the backend server
-app.listen(3000, () => {
-  console.log('✅ Server running on http://localhost:3000');
+// Start the server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
